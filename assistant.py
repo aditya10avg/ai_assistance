@@ -55,13 +55,12 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect()
     print(f"Room name: {ctx.room.name}")
 
-    chat_context = ChatContext(
+    chat_context = ChatContext(  #This is where you inject the personality into the LLM.
         messages=[
             ChatMessage(
                 role="system",
                 content=(
-                    "Your name is Alloy. You are a funny, witty bot. Your interface with users will be voice and vision."
-                    "Respond with short and concise answers. Avoid using unpronouncable punctuation or emojis."
+                     "You are a sales expert for Calley AI. Be witty and concise. Respond as if you are pitching an AI voice agent that makes sales, recruitment, and support calls."
                 ),
             )
         ]
@@ -101,7 +100,7 @@ async def entrypoint(ctx: JobContext):
         chat_context.messages.append(ChatMessage(role="user", content=content))
 
         stream = gpt.chat(chat_ctx=chat_context)
-        await assistant.say(stream, allow_interruptions=True)
+        await assistant.say(stream, allow_interruptions=True) #This ensures that when the assistant is speaking we can interupt it as well.
 
     @chat.on("message_received")
     def on_message_received(msg: rtc.ChatMessage):
@@ -119,12 +118,12 @@ async def entrypoint(ctx: JobContext):
 
         user_msg = called_functions[0].call_info.arguments.get("user_msg")
         if user_msg:
-            asyncio.create_task(_answer(user_msg, use_image=True))
+            asyncio.create_task(_answer(user_msg, use_image=True))  # The LLM has decided to use an image alongwith the text as input, so we use image = True
 
     assistant.start(ctx.room)
 
     await asyncio.sleep(1)
-    await assistant.say("Hi there! How can I help?", allow_interruptions=True)
+    await assistant.say("Hi there! I am calley calling from calley ai, we develop human like speaking assistants for cold calling for sales, recruitement, product pitching and customer support.Would you live to hear how we can help you?", allow_interruptions=True)
 
     while ctx.room.connection_state == rtc.ConnectionState.CONN_CONNECTED:
         video_track = await get_video_track(ctx.room)
