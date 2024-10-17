@@ -55,12 +55,12 @@ async def entrypoint(ctx: JobContext):
     await ctx.connect()
     print(f"Room name: {ctx.room.name}")
 
-    chat_context = ChatContext(  #This is where you inject the personality into the LLM.
+    chat_context = ChatContext(  # This is where you inject the personality into the LLM.
         messages=[
             ChatMessage(
                 role="system",
                 content=(
-                     "You are a sales expert for Calley AI. Be witty and concise. Respond as if you are pitching an AI voice agent that makes sales, recruitment, and support calls."
+                    "You are a sales expert for Calley AI. Be witty and concise. Respond as if you are pitching an AI voice agent that makes sales, recruitment, and support calls."
                 ),
             )
         ]
@@ -91,16 +91,33 @@ async def entrypoint(ctx: JobContext):
     async def _answer(text: str, use_image: bool = False):
         """
         Answer the user's message with the given text and optionally the latest
-        image captured from the video track.
+        image captured from the video track. Also, ask the LLM to determine user interest.
         """
         content: list[str | ChatImage] = [text]
         if use_image and latest_image:
             content.append(ChatImage(image=latest_image))
 
+        # Append user message to chat context
         chat_context.messages.append(ChatMessage(role="user", content=content))
 
-        stream = gpt.chat(chat_ctx=chat_context)
-        await assistant.say(stream, allow_interruptions=True) #This ensures that when the assistant is speaking we can interupt it as well.
+        # Add a system message asking LLM to determine interest
+        chat_context.messages.append(ChatMessage(role="system", content="Is the user expressing interest in the product or asking for any sort of meeting link or demo? Respond with 'yes' or 'no'."))
+
+        # Ask the LLM to determine user interest
+        response = await gpt.chat(chat_ctx=chat_context)
+
+        # Analyze the response from the LLM
+        is_interested = "yes" in response.lower()
+        
+        #Instead of using keywords to understand the user interest we are using the LLM to understand the user interest based on user responses earlier.
+        
+        if is_interested:
+            # Send a meeting link if the user is interested
+            meeting_link = "https://calendly.com/adityavg1005"  # Placeholder meeting link
+            chat_context.messages.append(ChatMessage(role="system", content=f"Great! You can schedule a meeting with us here: {meeting_link}"))
+
+        # Say the LLM-generated response
+        await assistant.say(response, allow_interruptions=True)
 
     @chat.on("message_received")
     def on_message_received(msg: rtc.ChatMessage):
@@ -118,12 +135,12 @@ async def entrypoint(ctx: JobContext):
 
         user_msg = called_functions[0].call_info.arguments.get("user_msg")
         if user_msg:
-            asyncio.create_task(_answer(user_msg, use_image=True))  # The LLM has decided to use an image alongwith the text as input, so we use image = True
+            asyncio.create_task(_answer(user_msg, use_image=True))  # The LLM has decided to use an image along with the text as input, so we use image = True
 
     assistant.start(ctx.room)
 
     await asyncio.sleep(1)
-    await assistant.say("Hi there! I am calley calling from calley ai, we develop human like speaking assistants for cold calling for sales, recruitement, product pitching and customer support.Would you live to hear how we can help you?", allow_interruptions=True)
+    await assistant.say("Hi there! I am Calley calling from Calley AI, we develop human-like speaking assistants for cold calling, sales, recruitment, product pitching, and customer support. Would you like to hear how we can help you?", allow_interruptions=True)
 
     while ctx.room.connection_state == rtc.ConnectionState.CONN_CONNECTED:
         video_track = await get_video_track(ctx.room)
